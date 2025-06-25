@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1068270161249",
+    "project_id": "chatbotfirebase-dcefc",
+    "storage_bucket": "chatbotfirebase-dcefc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1068270161249:android:260a12a3693e50ab0a0920",
+        "android_client_info": {
+          "package_name": "com.example.chatbot_firebase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTPobqlw3KTgUFmLDf75xlqhabtl-Mp98"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
