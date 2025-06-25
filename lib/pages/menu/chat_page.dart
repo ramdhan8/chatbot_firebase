@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -49,17 +50,47 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final List<AIModel> aiModels = [
-    AIModel(
-      name: 'Gemini',
-      apiKey: 'AIzaSyBnwtYHw5NBa03bcyXZL9KxBulZcF3MaGE',
-      modelName: 'gemini-1.5-flash-latest',
-    ),
-    AIModel(
-      name: 'Grok',
-      apiKey: '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',
-      modelName: 'llama3-70b-8192',
-    ),
-  ];
+  AIModel(
+    name: 'Gemini',
+    apiKey: dotenv.env['GOOGLE_API_KEY']!,
+    modelName: 'gemini-1.5-flash-latest',
+  ),
+  AIModel(
+    name: 'Grok',
+    apiKey: dotenv.env['GROQ_API_KEY']!,
+    modelName: 'llama3-70b-8192',
+  ),
+  AIModel(
+    name: 'DeepSeek',
+    apiKey: dotenv.env['OPENROUTER_API_KEY']!,
+    modelName: 'deepseek/deepseek-r1-0528:free',
+  ),
+  AIModel(
+    name: 'MistralAI',
+    apiKey: dotenv.env['OPENROUTER_API_KEY']!,
+    modelName: 'mistralai/mistral-small-3.2-24b-instruct:free',
+  ),
+  AIModel(
+    name: 'MoonshotAI',
+    apiKey: dotenv.env['OPENROUTER_API_KEY']!,
+    modelName: 'moonshotai/kimi-dev-72b:free',
+  ),
+  AIModel(
+    name: 'OpenvLab',
+    apiKey: dotenv.env['OPENROUTER_API_KEY']!,
+    modelName: 'opengvlab/internvl3-14b:free',
+  ),
+  AIModel(
+    name: 'Llama-3.1',
+    apiKey: dotenv.env['OPENROUTER_API_KEY']!,
+    modelName: 'nvidia/llama-3.1-nemotron-ultra-253b-v1:free',
+  ),
+  AIModel(
+    name: 'Gemma-3',
+    apiKey: dotenv.env['OPENROUTER_API_KEY']!,
+    modelName: 'google/gemma-3-27b-it:free',
+  ),
+];
 
   AIModel? selectedModel;
   TextEditingController messageController = TextEditingController();
@@ -100,22 +131,24 @@ class _ChatPageState extends State<ChatPage> {
         }).toList();
         chatHistory = decoded
             .where((item) => item['message'] != 'Typing...' && item['message'] != 'Listening...')
-            .map((item) => {
+            .map((item) => ({
                   'role': item['direction'] == 'right' ? 'user' : 'assistant',
                   'content': item['message'],
-                })
+                }))
             .toList();
       });
     } else {
       setState(() {
-        chatBubbles = [
-          const ChatBubble(
-            direction: Direction.left,
-            message: 'Halo, Ada yang bisa saya bantu?',
-            photoUrl: 'images/bot.png',
-            type: BubbleType.alone,
-          ),
-        ];
+        chatBubbles = selectedModel!.name == 'DeepSeek'
+            ? []
+            : [
+                const ChatBubble(
+                  direction: Direction.left,
+                  message: 'Halo, Ada yang bisa saya bantu?',
+                  photoUrl: 'images/bot.png',
+                  type: BubbleType.alone,
+                ),
+              ];
       });
     }
   }
@@ -182,14 +215,16 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       currentChatId = newChatId;
       chatStartTime = DateTime.now();
-      chatBubbles = [
-        const ChatBubble(
-          direction: Direction.left,
-          message: 'Halo, Ada yang bisa saya bantu?',
-          photoUrl: 'images/bot.png',
-          type: BubbleType.alone,
-        ),
-      ];
+      chatBubbles = selectedModel!.name == 'DeepSeek'
+          ? []
+          : [
+              const ChatBubble(
+                direction: Direction.left,
+                message: 'Halo, Ada yang bisa saya bantu?',
+                photoUrl: 'images/bot.png',
+                type: BubbleType.alone,
+              ),
+            ];
       chatHistory = [];
       messageController.clear();
     });
@@ -199,14 +234,16 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       selectedModel = newModel;
       chatHistory.clear();
-      chatBubbles = [
-        ChatBubble(
-          direction: Direction.left,
-          message: 'Model diubah ke ${newModel.name}. Ada yang bisa saya bantu?',
-          photoUrl: 'images/bot.png',
-          type: BubbleType.alone,
-        ),
-      ];
+      chatBubbles = selectedModel!.name == 'DeepSeek'
+          ? []
+          : [
+              ChatBubble(
+                direction: Direction.left,
+                message: 'Model diubah ke ${newModel.name}. Ada yang bisa saya bantu?',
+                photoUrl: 'images/bot.png',
+                type: BubbleType.alone,
+              ),
+            ];
     });
   }
 
@@ -246,13 +283,54 @@ class _ChatPageState extends State<ChatPage> {
           final data = jsonDecode(response.body);
           return data['choices'][0]['message']['content'];
         } else {
-          return 'Error: Failed to communicate with Groq API. Status: ${response.statusCode}';
+          return 'Error: Failed to communicate with Groq API. Status: ${response.statusCode}, Body: ${response.body}';
         }
       } catch (e) {
         return 'Error: $e';
       }
+    } else {
+      // Handle all OpenRouter models (DeepSeek, MistralAI, MoonshotAI, OpenvLab, Llama-3.1, Gemma-3)
+      try {
+        // Filter out initial assistant messages for OpenRouter models
+        final filteredHistory = chatHistory
+            .asMap()
+            .entries
+            .where((entry) => entry.key > 0 || entry.value['role'] == 'user')
+            .map((entry) => entry.value)
+            .toList();
+        final requestBody = {
+          'model': selectedModel!.modelName,
+          'messages': [
+            ...filteredHistory,
+            {'role': 'user', 'content': message},
+          ],
+        };
+        print('OpenRouter Request Headers: Authorization: Bearer ${selectedModel!.apiKey}');
+        print('OpenRouter Request Body: ${jsonEncode(requestBody)}');
+        for (int attempt = 0; attempt < 3; attempt++) {
+          final response = await http.post(
+            Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
+            headers: {
+              'Authorization': 'Bearer ${selectedModel!.apiKey}',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(requestBody),
+          );
+          print('OpenRouter Response [${selectedModel!.name}]: Status ${response.statusCode}, Body: ${response.body}');
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            return data['choices'][0]['message']['content'];
+          } else if (response.statusCode == 429 || response.statusCode == 503) {
+            await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
+            continue;
+          }
+          return 'Error: Failed to communicate with ${selectedModel!.name} API. Status: ${response.statusCode}, Body: ${response.body}';
+        }
+        return 'Error: Max retries exceeded for ${selectedModel!.name}';
+      } catch (e) {
+        return 'Error: $e';
+      }
     }
-    return null;
   }
 
   @override
@@ -512,7 +590,7 @@ class _ChatPageState extends State<ChatPage> {
                                       ),
                                       const ChatBubble(
                                         direction: Direction.left,
-                                        message: "Typing...",
+                                        message: 'Typing...',
                                         photoUrl: 'images/bot.png',
                                         type: BubbleType.alone,
                                       ),
@@ -546,7 +624,7 @@ class _ChatPageState extends State<ChatPage> {
                                       ...chatBubbles,
                                       const ChatBubble(
                                         direction: Direction.left,
-                                        message: "Listening...",
+                                        message: 'Listening...',
                                         photoUrl: 'images/bot.png',
                                         type: BubbleType.alone,
                                       ),
